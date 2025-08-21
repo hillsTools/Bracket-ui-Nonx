@@ -3,7 +3,7 @@ local UserInputService = game:GetService("UserInputService")
 local InsertService = game:GetService("InsertService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local PlayerService = game:GetService("Players")
+local PlayerService = game:GetService("Players") -- Moved before use
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 
