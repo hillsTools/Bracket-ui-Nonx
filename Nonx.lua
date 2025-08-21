@@ -721,6 +721,13 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 		and GetAsset("Slider/HighSlider")
 		or GetAsset("Slider/Slider")
 
+	-- Increase size for mobile touch targets
+	if Slider.Wide then
+		SliderAsset.Size = UDim2.new(1, 0, 0, 32) -- Increased height for better touch
+	else
+		SliderAsset.Size = UDim2.new(1, 0, 0, 40) -- Increased height for better touch
+	end
+	
 	Slider.ColorConfig = {true,"BackgroundColor3"}
 	Window.Colorable[SliderAsset.Background.Bar] = Slider.ColorConfig
 
@@ -733,6 +740,9 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 	SliderAsset.Background.Bar.Size = UDim2.fromScale(Scale(Slider.Value,Slider.Min,Slider.Max,0,1),1)
 	SliderAsset.Value.PlaceholderText = #Slider.Unit == 0 and Slider.Value or Slider.Value .. " " .. Slider.Unit
 
+	-- Make the bar background taller for easier touching
+	SliderAsset.Background.Size = UDim2.new(1, 0, 0, Slider.Wide and 16 or 20)
+	
 	local function AttachToMouse(Input)
 		local ScaleX = math.clamp((Input.Position.X - SliderAsset.Background.AbsolutePosition.X) / SliderAsset.Background.AbsoluteSize.X,0,1)
 		Slider.Value = Scale(ScaleX,0,1,Slider.Min,Slider.Max)
@@ -742,7 +752,8 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 		SliderAsset.Title:GetPropertyChangedSignal("TextBounds"):Connect(function()
 			SliderAsset.Value.Size = UDim2.new(0,SliderAsset.Value.TextBounds.X,1,0)
 			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset + 12,1,0)
-			SliderAsset.Size = UDim2.new(1,0,0,SliderAsset.Title.TextBounds.Y + 2)
+			-- Keep the increased height
+			SliderAsset.Size = UDim2.new(1,0,0,32)
 		end)
 		SliderAsset.Value:GetPropertyChangedSignal("TextBounds"):Connect(function()
 			SliderAsset.Value.Size = UDim2.new(0,SliderAsset.Value.TextBounds.X,1,0)
@@ -750,13 +761,14 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 		end)
 	else
 		SliderAsset.Title:GetPropertyChangedSignal("TextBounds"):Connect(function()
-			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,16)
-			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,16)
-			SliderAsset.Size = UDim2.new(1,0,0,SliderAsset.Title.TextBounds.Y + 8)
+			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,20) -- Increased height
+			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,20) -- Increased height
+			-- Keep the increased height
+			SliderAsset.Size = UDim2.new(1,0,0,40)
 		end)
 		SliderAsset.Value:GetPropertyChangedSignal("TextBounds"):Connect(function()
-			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,16)
-			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,16)
+			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,20) -- Increased height
+			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,20) -- Increased height
 		end)
 	end
 
@@ -771,19 +783,21 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 		Slider.Value = SliderAsset.Value.Text
 		SliderAsset.Value.Text = ""
 	end)
+	
+	-- Improved touch input handling for mobile
 	SliderAsset.InputBegan:Connect(function(Input)
-		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			AttachToMouse(Input)
 			Slider.Active = true
 		end
 	end)
 	SliderAsset.InputEnded:Connect(function(Input)
-		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			Slider.Active = false
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(Input)
-		if Slider.Active and Input.UserInputType == Enum.UserInputType.MouseMovement then
+		if Slider.Active and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
 			AttachToMouse(Input)
 		end
 	end)
