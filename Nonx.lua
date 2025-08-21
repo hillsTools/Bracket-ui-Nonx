@@ -85,9 +85,6 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 	local StartPosition,StartDrag = nil,nil
 	local dragConnection = nil
 	
-	-- Store the original position for clamping
-	local originalPosition = Object.Position
-	
 	-- Function to handle input began
 	local function onInputBegan(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
@@ -108,8 +105,11 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 					-- Calculate new position
 					local newPosition = Object.Position + UDim2.fromOffset(Delta.X,Delta.Y)
 					
-					-- Clamp position to screen bounds (optional but recommended for mobile)
-					local screenSize = CoreGui.AbsoluteSize
+					-- Get screen size from PlayerGui for proper clamping
+					local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+					local screenSize = playerGui and playerGui.AbsoluteSize or Vector2.new(1920, 1080)
+					
+					-- Clamp position to screen bounds (important for mobile)
 					local objectSize = Object.AbsoluteSize
 					
 					-- Convert UDim2 to pixel values for clamping
@@ -125,23 +125,24 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 					xPos = math.clamp(xPos, minX, maxX)
 					yPos = math.clamp(yPos, minY, maxY)
 					
-					-- Convert back to UDim2 if needed, or use the original calculation
-					if xPos ~= newPosition.X.Offset or yPos ~= newPosition.Y.Offset then
-						newPosition = UDim2.new(newPosition.X.Scale, xPos, newPosition.Y.Scale, yPos)
-					end
+					-- Convert back to UDim2
+					newPosition = UDim2.new(
+						newPosition.X.Scale, 
+						xPos - (newPosition.X.Scale * screenSize.X),
+						newPosition.Y.Scale, 
+						yPos - (newPosition.Y.Scale * screenSize.Y)
+					)
 					
 					OnTick(newPosition)
 				end
 			end)
+			
+			-- Visual feedback for mobile (optional)
+			if Input.UserInputType == Enum.UserInputType.Touch then
+				Object:TweenSize(UDim2.new(Object.Size.X.Scale, Object.Size.X.Offset * 1.02, 
+					Object.Size.Y.Scale, Object.Size.Y.Offset * 1.02), "Out", "Quad", 0.1, true)
+			end
 		end
-	end
-	
-	-- Connect to input events with improved touch handling
-	Dragger.InputBegan:Connect(onInputBegan)
-	
-	-- For better mobile support, also allow dragging by touching the object itself
-	if Dragger ~= Object then
-		Object.InputBegan:Connect(onInputBegan)
 	end
 	
 	-- Function to handle input ended
@@ -152,11 +153,25 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 				dragConnection:Disconnect()
 				dragConnection = nil
 			end
+			
+			-- Visual feedback for mobile (optional)
+			if Input.UserInputType == Enum.UserInputType.Touch then
+				Object:TweenSize(Object.Size, "Out", "Quad", 0.1, true)
+			end
+			
 			if OnStop then OnStop(Object.Position) end
 		end
 	end
 	
+	-- Connect to input events with improved touch handling
+	Dragger.InputBegan:Connect(onInputBegan)
 	Dragger.InputEnded:Connect(onInputEnded)
+	
+	-- For better mobile support, also allow dragging by touching the object itself
+	if Dragger ~= Object then
+		Object.InputBegan:Connect(onInputBegan)
+		Object.InputEnded:Connect(onInputEnded)
+	end
 	
 	-- Also handle input ending anywhere on the screen
 	UserInputService.InputEnded:Connect(function(Input)
@@ -166,6 +181,12 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 				dragConnection:Disconnect()
 				dragConnection = nil
 			end
+			
+			-- Visual feedback for mobile (optional)
+			if Input.UserInputType == Enum.UserInputType.Touch then
+				Object:TweenSize(Object.Size, "Out", "Quad", 0.1, true)
+			end
+			
 			if OnStop then OnStop(Object.Position) end
 		end
 	end)
