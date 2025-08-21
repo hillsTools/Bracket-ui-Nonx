@@ -85,7 +85,11 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 	local StartPosition,StartDrag = nil,nil
 	local dragConnection = nil
 	
-	Dragger.InputBegan:Connect(function(Input)
+	-- Store the original position for clamping
+	local originalPosition = Object.Position
+	
+	-- Function to handle input began
+	local function onInputBegan(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			StartPosition = UserInputService:GetMouseLocation()
 			StartDrag = Object.AbsolutePosition
@@ -100,21 +104,48 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 					local Mouse = UserInputService:GetMouseLocation()
 					local Delta = Mouse - StartPosition 
 					StartPosition = Mouse
-					OnTick(Object.Position + UDim2.fromOffset(Delta.X,Delta.Y))
+					
+					-- Calculate new position
+					local newPosition = Object.Position + UDim2.fromOffset(Delta.X,Delta.Y)
+					
+					-- Clamp position to screen bounds (optional but recommended for mobile)
+					local screenSize = CoreGui.AbsoluteSize
+					local objectSize = Object.AbsoluteSize
+					
+					-- Convert UDim2 to pixel values for clamping
+					local xPos = newPosition.X.Offset + (newPosition.X.Scale * screenSize.X)
+					local yPos = newPosition.Y.Offset + (newPosition.Y.Scale * screenSize.Y)
+					
+					-- Clamp to screen bounds with some padding
+					local minX = 0
+					local maxX = screenSize.X - objectSize.X
+					local minY = 0
+					local maxY = screenSize.Y - objectSize.Y
+					
+					xPos = math.clamp(xPos, minX, maxX)
+					yPos = math.clamp(yPos, minY, maxY)
+					
+					-- Convert back to UDim2 if needed, or use the original calculation
+					if xPos ~= newPosition.X.Offset or yPos ~= newPosition.Y.Offset then
+						newPosition = UDim2.new(newPosition.X.Scale, xPos, newPosition.Y.Scale, yPos)
+					end
+					
+					OnTick(newPosition)
 				end
 			end)
 		end
-	end)
+	end
 	
-	-- Use InputChanged to handle touch movement outside the dragger
-	UserInputService.InputChanged:Connect(function(Input)
-		if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and StartDrag then
-			-- Keep updating the start position for smooth dragging
-			StartPosition = UserInputService:GetMouseLocation()
-		end
-	end)
+	-- Connect to input events with improved touch handling
+	Dragger.InputBegan:Connect(onInputBegan)
 	
-	Dragger.InputEnded:Connect(function(Input)
+	-- For better mobile support, also allow dragging by touching the object itself
+	if Dragger ~= Object then
+		Object.InputBegan:Connect(onInputBegan)
+	end
+	
+	-- Function to handle input ended
+	local function onInputEnded(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			StartPosition,StartDrag = nil,nil
 			if dragConnection then
@@ -123,7 +154,9 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 			end
 			if OnStop then OnStop(Object.Position) end
 		end
-	end)
+	end
+	
+	Dragger.InputEnded:Connect(onInputEnded)
 	
 	-- Also handle input ending anywhere on the screen
 	UserInputService.InputEnded:Connect(function(Input)
@@ -134,6 +167,14 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 				dragConnection = nil
 			end
 			if OnStop then OnStop(Object.Position) end
+		end
+	end)
+	
+	-- Improved touch movement handling
+	UserInputService.InputChanged:Connect(function(Input)
+		if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and StartDrag then
+			-- Keep updating the start position for smooth dragging
+			StartPosition = UserInputService:GetMouseLocation()
 		end
 	end)
 end
