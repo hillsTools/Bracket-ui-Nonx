@@ -101,15 +101,33 @@ local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 					local Delta = Mouse - StartPosition 
 					StartPosition = Mouse
 					OnTick(Object.Position + UDim2.fromOffset(Delta.X,Delta.Y))
-				else
-					dragConnection:Disconnect()
 				end
 			end)
 		end
 	end)
 	
+	-- Use InputChanged to handle touch movement outside the dragger
+	UserInputService.InputChanged:Connect(function(Input)
+		if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and StartDrag then
+			-- Keep updating the start position for smooth dragging
+			StartPosition = UserInputService:GetMouseLocation()
+		end
+	end)
+	
 	Dragger.InputEnded:Connect(function(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+			StartPosition,StartDrag = nil,nil
+			if dragConnection then
+				dragConnection:Disconnect()
+				dragConnection = nil
+			end
+			if OnStop then OnStop(Object.Position) end
+		end
+	end)
+	
+	-- Also handle input ending anywhere on the screen
+	UserInputService.InputEnded:Connect(function(Input)
+		if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and StartDrag then
 			StartPosition,StartDrag = nil,nil
 			if dragConnection then
 				dragConnection:Disconnect()
