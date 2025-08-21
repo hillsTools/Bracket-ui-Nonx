@@ -83,48 +83,79 @@ end
 
 local function MakeDraggable(Dragger,Object,OnTick,OnStop)
 	local StartPosition,StartDrag = nil,nil
+	local dragConnection = nil
+	
 	Dragger.InputBegan:Connect(function(Input)
-		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			StartPosition = UserInputService:GetMouseLocation()
 			StartDrag = Object.AbsolutePosition
+			
+			-- Continuous dragging with RenderStepped
+			if dragConnection then
+				dragConnection:Disconnect()
+			end
+			
+			dragConnection = RunService.RenderStepped:Connect(function()
+				if StartDrag then
+					local Mouse = UserInputService:GetMouseLocation()
+					local Delta = Mouse - StartPosition 
+					StartPosition = Mouse
+					OnTick(Object.Position + UDim2.fromOffset(Delta.X,Delta.Y))
+				else
+					dragConnection:Disconnect()
+				end
+			end)
 		end
 	end)
-	UserInputService.InputChanged:Connect(function(Input)
-		if StartDrag and Input.UserInputType == Enum.UserInputType.MouseMovement then
-			local Mouse = UserInputService:GetMouseLocation()
-			local Delta = Mouse - StartPosition StartPosition = Mouse
-			OnTick(Object.Position + UDim2.fromOffset(Delta.X,Delta.Y))
-		end
-	end)
+	
 	Dragger.InputEnded:Connect(function(Input)
-		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			StartPosition,StartDrag = nil,nil
+			if dragConnection then
+				dragConnection:Disconnect()
+				dragConnection = nil
+			end
 			if OnStop then OnStop(Object.Position) end
 		end
 	end)
 end
 local function MakeResizeable(Dragger,Object,MinSize,OnTick,OnStop)
 	local StartPosition,StartSize = nil,nil
+	local resizeConnection = nil
+	
 	Dragger.InputBegan:Connect(function(Input)
-		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			StartPosition = UserInputService:GetMouseLocation()
 			StartSize = Object.AbsoluteSize
-		end
-	end)
-	UserInputService.InputChanged:Connect(function(Input)
-		if StartPosition and Input.UserInputType == Enum.UserInputType.MouseMovement then
-			local Mouse = UserInputService:GetMouseLocation()
-			local Delta = Mouse - StartPosition
+			
+			-- Continuous resizing with RenderStepped
+			if resizeConnection then
+				resizeConnection:Disconnect()
+			end
+			
+			resizeConnection = RunService.RenderStepped:Connect(function()
+				if StartPosition then
+					local Mouse = UserInputService:GetMouseLocation()
+					local Delta = Mouse - StartPosition
 
-			local Size = StartSize + Delta
-			local SizeX = math.max(MinSize.X,Size.X)
-			local SizeY = math.max(MinSize.Y,Size.Y)
-			OnTick(UDim2.fromOffset(SizeX,SizeY))
+					local Size = StartSize + Delta
+					local SizeX = math.max(MinSize.X,Size.X)
+					local SizeY = math.max(MinSize.Y,Size.Y)
+					OnTick(UDim2.fromOffset(SizeX,SizeY))
+				else
+					resizeConnection:Disconnect()
+				end
+			end)
 		end
 	end)
+	
 	Dragger.InputEnded:Connect(function(Input)
-		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			StartPosition,StartSize = nil,nil
+			if resizeConnection then
+				resizeConnection:Disconnect()
+				resizeConnection = nil
+			end
 			if OnStop then OnStop(Object.Size) end
 		end
 	end)
@@ -733,8 +764,11 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 	SliderAsset.Background.Bar.Size = UDim2.fromScale(Scale(Slider.Value,Slider.Min,Slider.Max,0,1),1)
 	SliderAsset.Value.PlaceholderText = #Slider.Unit == 0 and Slider.Value or Slider.Value .. " " .. Slider.Unit
 
+	-- Position title more on top
+	SliderAsset.Title.Position = UDim2.new(0, 0, 0, -2)
+	
 	-- Slightly increase the height of the slider background for better touch targets
-	SliderAsset.Background.Size = UDim2.new(1, 0, 0, Slider.Wide and 12 or 14)
+	SliderAsset.Background.Size = UDim2.new(1, 0, 0, Slider.Wide and 10 or 12)
 
 	local function AttachToMouse(Input)
 		local ScaleX = math.clamp((Input.Position.X - SliderAsset.Background.AbsolutePosition.X) / SliderAsset.Background.AbsoluteSize.X,0,1)
@@ -746,7 +780,7 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 			SliderAsset.Value.Size = UDim2.new(0,SliderAsset.Value.TextBounds.X,1,0)
 			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset + 12,1,0)
 			-- Slightly increase height for better touch
-			SliderAsset.Size = UDim2.new(1,0,0,SliderAsset.Title.TextBounds.Y + 4)
+			SliderAsset.Size = UDim2.new(1,0,0,SliderAsset.Title.TextBounds.Y + 2)
 		end)
 		SliderAsset.Value:GetPropertyChangedSignal("TextBounds"):Connect(function()
 			SliderAsset.Value.Size = UDim2.new(0,SliderAsset.Value.TextBounds.X,1,0)
@@ -754,14 +788,14 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 		end)
 	else
 		SliderAsset.Title:GetPropertyChangedSignal("TextBounds"):Connect(function()
-			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,18) -- Slightly taller
-			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,18) -- Slightly taller
+			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,16) -- Slightly taller
+			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,16) -- Slightly taller
 			-- Slightly increase height for better touch
-			SliderAsset.Size = UDim2.new(1,0,0,SliderAsset.Title.TextBounds.Y + 10)
+			SliderAsset.Size = UDim2.new(1,0,0,SliderAsset.Title.TextBounds.Y + 8)
 		end)
 		SliderAsset.Value:GetPropertyChangedSignal("TextBounds"):Connect(function()
-			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,18) -- Slightly taller
-			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,18) -- Slightly taller
+			SliderAsset.Value.Size = UDim2.fromOffset(SliderAsset.Value.TextBounds.X,16) -- Slightly taller
+			SliderAsset.Title.Size = UDim2.new(1,-SliderAsset.Value.Size.X.Offset,0,16) -- Slightly taller
 		end)
 	end
 
@@ -777,40 +811,57 @@ function Assets:Slider(Parent,ScreenAsset,Window,Slider)
 		SliderAsset.Value.Text = ""
 	end)
 	
-	-- Improved touch input handling for mobile
-	local function handleInput(Input)
+	-- Improved touch input handling for mobile with continuous dragging
+	local dragConnection = nil
+	
+	local function startDrag(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-			AttachToMouse(Input)
 			Slider.Active = true
+			AttachToMouse(Input)
 			
 			-- Create a visual indicator that the slider is being dragged
 			SliderAsset.Background.Bar.BorderSizePixel = 1
 			SliderAsset.Background.Bar.BorderColor3 = Color3.new(1, 1, 1)
+			
+			-- Connect to continuous dragging
+			if dragConnection then
+				dragConnection:Disconnect()
+			end
+			
+			dragConnection = RunService.RenderStepped:Connect(function()
+				if Slider.Active then
+					local mouseLocation = UserInputService:GetMouseLocation()
+					local ScaleX = math.clamp((mouseLocation.X - SliderAsset.Background.AbsolutePosition.X) / SliderAsset.Background.AbsoluteSize.X,0,1)
+					Slider.Value = Scale(ScaleX,0,1,Slider.Min,Slider.Max)
+				else
+					dragConnection:Disconnect()
+				end
+			end)
 		end
 	end
 	
-	local function endInput(Input)
+	local function endDrag(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 			Slider.Active = false
 			
 			-- Remove visual indicator
 			SliderAsset.Background.Bar.BorderSizePixel = 0
+			
+			-- Disconnect continuous dragging
+			if dragConnection then
+				dragConnection:Disconnect()
+				dragConnection = nil
+			end
 		end
 	end
 	
 	-- Connect events for both mouse and touch
-	SliderAsset.InputBegan:Connect(handleInput)
-	SliderAsset.InputEnded:Connect(endInput)
+	SliderAsset.InputBegan:Connect(startDrag)
+	SliderAsset.InputEnded:Connect(endDrag)
 	
 	-- Also allow dragging by touching anywhere on the slider background
-	SliderAsset.Background.InputBegan:Connect(handleInput)
-	SliderAsset.Background.InputEnded:Connect(endInput)
-	
-	UserInputService.InputChanged:Connect(function(Input)
-		if Slider.Active and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
-			AttachToMouse(Input)
-		end
-	end)
+	SliderAsset.Background.InputBegan:Connect(startDrag)
+	SliderAsset.Background.InputEnded:Connect(endDrag)
 
 	Slider:GetPropertyChangedSignal("Name"):Connect(function(Name)
 		SliderAsset.Title.Text = Name
